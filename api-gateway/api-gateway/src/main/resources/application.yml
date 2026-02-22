@@ -1,0 +1,15 @@
+server:
+  port: 9090
+
+spring:
+  application:
+    name: api-gateway-zacamil
+  cloud:
+    gateway:
+      server:
+        webmvc:
+          routes:
+            - id: ruta-alta-medica
+              uri: http://localhost:8080
+              predicates:
+                - Path=/api/v1/altas
