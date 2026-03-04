@@ -136,6 +136,7 @@ export default function Dashboard() {
                         </label>
                         <textarea
                             id="diagnostico"
+                            required
                             rows={3}
                             value={diagnostico}
                             onChange={(e) => setDiagnostico(e.target.value)}
