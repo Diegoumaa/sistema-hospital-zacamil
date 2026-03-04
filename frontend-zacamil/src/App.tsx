@@ -1,28 +1,25 @@
-import { useState } from 'react';
+import { AuthProvider, useAuth } from './context/AuthContext';
 import Login from './components/Login';
 import Dashboard from './components/Dashboard';
 
-function App() {
-  // Creamos una variable de estado. Empieza en 'false' (no logueado).
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-
-  // Función que cambia el estado a 'true'
-  const handleLogin = () => {
-    setIsLoggedIn(true);
-  };
-
+function AppContent() {
+  const { medico } = useAuth();
   return (
     <>
-      {/* Esto es un renderizado condicional: 
-        Si isLoggedIn es true, muestra el Dashboard.
-        Si es false, muestra el Login y le pasa la función handleLogin.
-      */}
-      {isLoggedIn ? (
+      {medico ? (
         <Dashboard />
       ) : (
-        <Login onLogin={handleLogin} />
+        <Login />
       )}
     </>
+  );
+}
+
+function App() {
+  return (
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
   );
 }
 
