@@ -18,12 +18,20 @@ public class AltaMedicaService {
     public Cama procesarSolicitudAlta(String numeroCama) {
         // 1. Buscamos la cama en la base de datos
         Cama cama = camaRepository.findByNumeroCama(numeroCama)
-                .orElseThrow(() -> new RuntimeException("Cama no encontrada: " + numeroCama));
+                .orElseThrow(() -> new RuntimeException("La cama " + numeroCama + " no existe en el censo del hospital."));
 
-        // 2. Cambiamos el estado (El inicio de tu SAGA)
+        // 2. LÓGICA DE NEGOCIO: Validamos el estado actual antes de hacer cambios
+        if ("ALTA_SOLICITADA".equals(cama.getEstado())) {
+            throw new RuntimeException("El alta ya fue solicitada previamente para esta cama.");
+        }
+        if ("DISPONIBLE".equals(cama.getEstado())) {
+            throw new RuntimeException("Esta cama ya está disponible, no se puede procesar un alta médica.");
+        }
+
+        // 3. Si pasó las validaciones, cambiamos el estado
         cama.setEstado("ALTA_SOLICITADA");
 
-        // 3. Guardamos en la Write DB
+        // 4. Guardamos en la Write DB
         return camaRepository.save(cama);
 
         // NOTA: En la Épica 3, aquí mismo agregaremos el código para enviar el evento a Azure Service Bus.
