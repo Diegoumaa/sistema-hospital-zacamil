@@ -1,17 +1,17 @@
 import apiClient from '../api/axiosClient';
-import type { AltaMedicaRequest } from '../schemas/altaMedicaSchema';
-import { AltaMedicaRequestSchema } from '../schemas/altaMedicaSchema';
+import type { FhirEncounter } from '../schemas/altaMedicaSchema';
+import { FhirEncounterSchema } from '../schemas/altaMedicaSchema';
 import { AxiosError } from 'axios';
 
 export const altaMedicaService = {
     /**
      * Envía una solicitud de alta médica al API Gateway.
-     * @param data Objeto con la información de la cama
+     * @param data Objeto con la información FHIR del alta
      */
-    procesarAlta: async (data: AltaMedicaRequest) => {
+    procesarAlta: async (data: FhirEncounter) => {
         // 1. Validación de Runtime con Zod (Robustez preventiva)
         // Antes de salir a internet, verificamos que nuestros datos estén bien.
-        const validData = AltaMedicaRequestSchema.parse(data);
+        const validData = FhirEncounterSchema.parse(data);
 
         try {
             // 2. Hacemos la petición usando nuestra instancia configurada

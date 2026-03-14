@@ -1,4 +1,8 @@
-export default function Login({ onLogin }: { onLogin: () => void }) {
+import { useAuth } from '../context/AuthContext';
+
+export default function Login() {
+    const { loginMedico } = useAuth();
+
     return (
         <div className="flex h-screen items-center justify-center bg-gray-100">
             <div className="w-full max-w-md rounded-lg bg-white p-8 shadow-md">
@@ -35,7 +39,7 @@ export default function Login({ onLogin }: { onLogin: () => void }) {
 
                 <button
                     type="button"
-                    onClick={onLogin}
+                    onClick={() => loginMedico()}
                     className="w-full rounded-md bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
                 >
                     Ingresar
