@@ -2,22 +2,23 @@ import { useState } from "react";
 import { altaMedicaService } from "../services/altaMedicaService";
 import { ZodError } from "zod";
 import { useAuth } from "../context/AuthContext";
+import { useToast } from "../context/ToastContext";
+import { ComboboxCamas } from "./ui/ComboboxCamas";
 import type { FhirEncounter } from "../schemas/altaMedicaSchema";
 
 export default function Dashboard() {
     const { medico, logout } = useAuth();
+    const { addToast } = useToast();
 
     const [pacienteId, setPacienteId] = useState("");
     const [numeroCama, setNumeroCama] = useState("");
     const [diagnostico, setDiagnostico] = useState("");
 
-    const [mensaje, setMensaje] = useState<string>('');
     const [cargando, setCargando] = useState<boolean>(false);
 
     const solicitarAlta = async (e: React.FormEvent) => {
         e.preventDefault();
         setCargando(true);
-        setMensaje('');
 
         try {
             const payload: FhirEncounter = {
@@ -41,8 +42,8 @@ export default function Dashboard() {
                 }
             };
 
-            const respuesta = await altaMedicaService.procesarAlta(payload);
-            setMensaje(`¡Éxito! Operación completada: ${JSON.stringify(respuesta)}`);
+            await altaMedicaService.procesarAlta(payload);
+            addToast(`¡Alta médica generada exitosamente!`, 'success');
             
             // Limpiar formulario tras éxito (opcional)
             setPacienteId("");
@@ -54,11 +55,11 @@ export default function Dashboard() {
 
             if (error instanceof ZodError) {
                 const firstIssueMessage = error.issues[0]?.message ?? 'Datos inválidos.';
-                setMensaje(`Error de validación: ${firstIssueMessage}`);
+                addToast(`Por favor verifique los datos: ${firstIssueMessage}`, 'error');
             } else if (error instanceof Error) {
-                setMensaje(error.message);
+                addToast(`Error al procesar el alta: ${error.message}`, 'error');
             } else {
-                setMensaje('Ocurrió un error inesperado.');
+                addToast('Ocurrió un error de red o de servidor. Por favor, vuelva a intentarlo.', 'error');
             }
         } finally {
             setCargando(false)
@@ -115,18 +116,10 @@ export default function Dashboard() {
                             <label htmlFor="numeroCama" className="mb-1.5 block text-sm font-medium text-gray-700">
                                 Número de Cama
                             </label>
-                            <select
-                                id="numeroCama"
-                                required
+                            <ComboboxCamas
                                 value={numeroCama}
-                                onChange={(e) => setNumeroCama(e.target.value)}
-                                className="w-full rounded-md border border-gray-300 px-3 py-2.5 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white transition-shadow"
-                            >
-                                <option value="" disabled>Seleccione una cama</option>
-                                <option value="101">Cama 101 - Observación</option>
-                                <option value="102">Cama 102 - Recuperación</option>
-                                <option value="205">Cama 205 - Cuidados Intensivos</option>
-                            </select>
+                                onChange={setNumeroCama}
+                            />
                         </div>
                     </div>
 
@@ -180,14 +173,6 @@ export default function Dashboard() {
                             ) : 'Generar Alta Médica'}
                         </button>
                     </div>
-
-                    {mensaje && (
-                        <div className={`mt-4 rounded-md p-4 text-sm font-medium border ${
-                            mensaje.includes('Éxito') ? 'bg-green-50 text-green-800 border-green-200' : 'bg-red-50 text-red-800 border-red-200'
-                        }`}>
-                            {mensaje}
-                        </div>
-                    )}
                 </form>
             </main>
         </div>

@@ -1,10 +1,24 @@
 import React, { useEffect, useState } from 'react';
 import { getCamasContaminadas, type CamaLimpieza } from '../services/limpiezaService';
+import { useToast } from '../context/ToastContext';
+import { ModalConfirmacion } from './ui/ModalConfirmacion';
+import { SkeletonLoader } from './ui/SkeletonLoader';
+import { EmptyState } from './ui/EmptyState';
 
 const PanelLimpieza: React.FC = () => {
+    const { addToast } = useToast();
     const [camas, setCamas] = useState<CamaLimpieza[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
+    const [camaSeleccionada, setCamaSeleccionada] = useState<CamaLimpieza | null>(null);
+
+    const handleConfirmarLimpieza = () => {
+        if (camaSeleccionada) {
+            addToast(`Cama ${camaSeleccionada.numeroCama} marcada como limpia en el sistema.`, 'success');
+            setCamas(prev => prev.filter(c => c.id !== camaSeleccionada.id));
+            setCamaSeleccionada(null);
+        }
+    };
 
     const fetchCamas = async () => {
         try {
@@ -14,7 +28,8 @@ const PanelLimpieza: React.FC = () => {
             setError('');
         } catch (err: any) {
             console.error(err);
-            setError('Error al obtener camas. Verifique conexión al servidor.');
+            addToast('No se pudo conectar con el servidor. Verifique su conexión y vuelva a intentarlo.', 'error');
+            setError('Error de conexión.');
         } finally {
             setLoading(false);
         }
@@ -42,10 +57,7 @@ const PanelLimpieza: React.FC = () => {
                 </div>
 
                 {loading ? (
-                    <div className="flex flex-col justify-center items-center h-64 gap-4">
-                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600"></div>
-                        <p className="text-slate-500 font-medium">Buscando tareas pendientes...</p>
-                    </div>
+                    <SkeletonLoader count={8} />
                 ) : error ? (
                     <div className="bg-red-50 border-l-4 border-red-500 p-5 rounded-md shadow-sm">
                         <div className="flex items-center">
@@ -54,13 +66,10 @@ const PanelLimpieza: React.FC = () => {
                         </div>
                     </div>
                 ) : camas.length === 0 ? (
-                    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-16 text-center animate-fade-in transition-all">
-                        <div className="mx-auto w-20 h-20 bg-emerald-50 rounded-full flex items-center justify-center mb-5 shadow-inner">
-                            <svg className="w-10 h-10 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
-                        </div>
-                        <h3 className="text-2xl font-bold text-slate-800 mb-2">¡Todo impecable!</h3>
-                        <p className="text-slate-500 text-lg">No hay camas contaminadas asignadas en el sistema en este instante.</p>
-                    </div>
+                    <EmptyState 
+                        title="¡Todo impecable!" 
+                        description="¡Excelente trabajo! No hay camas contaminadas asignadas en el sistema en este instante." 
+                    />
                 ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                         {camas.map((cama) => (
@@ -79,9 +88,7 @@ const PanelLimpieza: React.FC = () => {
                                 <div className="bg-slate-50 px-6 py-4 border-t border-slate-100 mt-auto flex justify-between items-center group-hover:bg-slate-100 transition-colors">
                                     <span className="text-xs font-semibold text-slate-500 uppercase">Acción Requerida</span>
                                     <button 
-                                        onClick={() => {
-                                            alert("Lógica de marcaje de limpieza no implementada (scope no contemplado).");
-                                        }}
+                                        onClick={() => setCamaSeleccionada(cama)}
                                         className="bg-slate-800 hover:bg-slate-900 focus:ring-4 focus:ring-slate-300 text-white font-semibold py-2 px-5 rounded-lg transition-all shadow-md active:scale-95 text-sm"
                                     >
                                         Marcar Limpia
@@ -92,6 +99,16 @@ const PanelLimpieza: React.FC = () => {
                     </div>
                 )}
             </div>
+
+            <ModalConfirmacion 
+                isOpen={!!camaSeleccionada}
+                title={`Confirmar Limpieza de Cama ${camaSeleccionada?.numeroCama}`}
+                message={`¿Confirma que la Cama ${camaSeleccionada?.numeroCama} ha sido desinfectada según el protocolo y está lista para recibir pacientes?`}
+                confirmText="Confirmar Limpieza"
+                cancelText="Cancelar"
+                onConfirm={handleConfirmarLimpieza}
+                onClose={() => setCamaSeleccionada(null)}
+            />
         </div>
     );
 };
