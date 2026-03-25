@@ -16,6 +16,7 @@
         <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
         <outputRelativeToContentRoot value="true" />
         <module name="api-gateway" />
+        <module name="servicio-limpieza" />
       </profile>
     </annotationProcessing>
   </component>
@@ -23,6 +24,7 @@
     <option name="ADDITIONAL_OPTIONS_OVERRIDE">
       <module name="alta-medica-servic" options="-parameters" />
       <module name="api-gateway" options="-parameters" />
+      <module name="servicio-limpieza" options="-parameters" />
     </option>
   </component>
 </project>
