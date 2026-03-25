@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { getCamasContaminadas, type CamaLimpieza } from '../services/limpiezaService';
+import { getCamasContaminadas, marcarCamaLimpia, type CamaLimpieza } from '../services/limpiezaService';
 import { useToast } from '../context/ToastContext';
 import { ModalConfirmacion } from './ui/ModalConfirmacion';
 import { SkeletonLoader } from './ui/SkeletonLoader';
@@ -9,14 +9,24 @@ const PanelLimpieza: React.FC = () => {
     const { addToast } = useToast();
     const [camas, setCamas] = useState<CamaLimpieza[]>([]);
     const [loading, setLoading] = useState(true);
+    const [isUpdating, setIsUpdating] = useState(false);
     const [error, setError] = useState('');
     const [camaSeleccionada, setCamaSeleccionada] = useState<CamaLimpieza | null>(null);
 
-    const handleConfirmarLimpieza = () => {
-        if (camaSeleccionada) {
+    const handleConfirmarLimpieza = async () => {
+        if (!camaSeleccionada) return;
+        
+        setIsUpdating(true);
+        try {
+            await marcarCamaLimpia(camaSeleccionada.numeroCama);
             addToast(`Cama ${camaSeleccionada.numeroCama} marcada como limpia en el sistema.`, 'success');
             setCamas(prev => prev.filter(c => c.id !== camaSeleccionada.id));
             setCamaSeleccionada(null);
+        } catch (err: any) {
+            console.error(err);
+            addToast('Error al marcar la cama como limpia. Intente nuevamente.', 'error');
+        } finally {
+            setIsUpdating(false);
         }
     };
 
@@ -106,6 +116,7 @@ const PanelLimpieza: React.FC = () => {
                 message={`¿Confirma que la Cama ${camaSeleccionada?.numeroCama} ha sido desinfectada según el protocolo y está lista para recibir pacientes?`}
                 confirmText="Confirmar Limpieza"
                 cancelText="Cancelar"
+                isLoading={isUpdating}
                 onConfirm={handleConfirmarLimpieza}
                 onClose={() => setCamaSeleccionada(null)}
             />

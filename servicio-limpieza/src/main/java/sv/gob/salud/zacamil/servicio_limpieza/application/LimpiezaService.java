@@ -40,4 +40,15 @@ public class LimpiezaService {
             throw e;
         }
     }
+
+    @Transactional
+    public void marcarCamaComoLimpia(String numeroCama) {
+        CamaLimpieza cama = camaLimpiezaRepository.findByNumeroCama(numeroCama)
+                .orElseThrow(() -> new IllegalArgumentException("Cama " + numeroCama + " no encontrada"));
+        
+        cama.setEstado("LIMPIA");
+        camaLimpiezaRepository.save(cama);
+        
+        log.info("Cama {} marcada como LIMPIA exitosamente", numeroCama);
+    }
 }

@@ -11,3 +11,7 @@ export const getCamasContaminadas = async (): Promise<CamaLimpieza[]> => {
     const response = await apiClient.get<CamaLimpieza[]>('/limpieza/camas-contaminadas');
     return response.data;
 };
+
+export const marcarCamaLimpia = async (numeroCama: string): Promise<void> => {
+    await apiClient.put(`/limpieza/camas/${numeroCama}/limpiar`);
+};
