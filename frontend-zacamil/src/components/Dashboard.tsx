@@ -29,7 +29,7 @@ export default function Dashboard() {
                 location: [
                     {
                         location: {
-                            reference: `Location/CAMA-${numeroCama}`
+                            reference: `Location/${numeroCama}`
                         }
                     }
                 ],

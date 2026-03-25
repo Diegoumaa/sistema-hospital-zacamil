@@ -40,12 +40,14 @@ public class AltaMedicaController {
                 return ResponseEntity.badRequest().body("Error: Formato FHIR inválido. Falta la referencia de la cama.");
             }
 
-            // 2. Extraemos y limpiamos el número de cama (Quitamos "Location/CAMA-")
+            // 2. Extraemos y limpiamos el número de cama
             String referencia = request.location.get(0).location.reference;
-            String numeroCama = referencia.replace("Location/CAMA-", "").replace("Location/Cama-", "");
+            String numeroCamaExtraido = referencia.replace("Location/CAMA-", "").replace("Location/Cama-", "").replace("Location/", "");
+
+            System.out.println("Intentando buscar en BD el numeroCama exacto: [" + numeroCamaExtraido + "]");
 
             // 3. Procesamos con la lógica de negocio
-            Cama camaActualizada = altaMedicaService.procesarSolicitudAlta(numeroCama);
+            Cama camaActualizada = altaMedicaService.procesarSolicitudAlta(numeroCamaExtraido);
 
             return ResponseEntity.ok("Alta procesada exitosamente bajo estándar FHIR Encounter para la cama: " + camaActualizada.getNumeroCama());
         } catch (Exception e) {

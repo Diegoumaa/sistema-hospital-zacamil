@@ -13,3 +13,7 @@ spring:
               uri: http://localhost:8080
               predicates:
                 - Path=/api/v1/altas
+            - id: ruta-limpieza
+              uri: http://localhost:8082
+              predicates:
+                - Path=/api/v1/limpieza/**
