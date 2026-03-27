@@ -13,11 +13,13 @@
 	<version>0.0.1-SNAPSHOT</version>
 	<name>servicio-limpieza</name>
 	<description>Servicio de Limpieza (Consumidor Service Bus)</description>
-	<properties>
-		<java.version>21</java.version>
-		<spring-cloud.version>2023.0.1</spring-cloud.version>
-		<spring-cloud-azure.version>5.10.0</spring-cloud-azure.version>
-	</properties>
+    <properties>
+        <java.version>21</java.version>
+        <maven.compiler.source>21</maven.compiler.source>
+        <maven.compiler.target>21</maven.compiler.target>
+        <spring-cloud.version>2023.0.1</spring-cloud.version>
+        <spring-cloud-azure.version>5.10.0</spring-cloud-azure.version>
+    </properties>
 	<dependencies>
 		<!-- Web -->
 		<dependency>
