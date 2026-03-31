@@ -9,6 +9,7 @@ import sv.gob.salud.zacamil.alta_medica_servic.infrastructure.CamaRepository;
 
 @Service
 public class AltaMedicaService {
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(AltaMedicaService.class);
 
     private final CamaRepository camaRepository;
     private final StreamBridge streamBridge;
@@ -40,25 +41,18 @@ public class AltaMedicaService {
                     "ALTA_SOLICITADA"
             );
 
-            System.out.println("Intentando enviar evento a Azure para la cama: " + numeroCama);
+            log.info("📤 [SERVICE BUS] Intentando publicar evento de alta para la cama: {}", numeroCama);
 
             boolean enviado = streamBridge.send("enviarAlta-out-0", evento);
 
             if (enviado) {
-                System.out.println("✅ EVENTO ENVIADO A AZURE EXITOSAMENTE.");
+                log.info("✅ [SERVICE BUS] Evento ENVIADO A AZURE exitosamente.");
             } else {
-                System.err.println("⚠️ Azure recibió la petición pero el Binder devolvió 'false'. Revisa el nombre del tópico.");
+                log.warn("⚠️ [SERVICE BUS] Azure recibió la petición pero el Binder devolvió 'false'.");
             }
 
         } catch (Exception e) {
-            System.err.println("❌ ERROR CRÍTICO AL ENVIAR A AZURE: " + e.getMessage());
-            System.err.println("--- INICIO DEL RASTRO DETALLADO (STACK TRACE) ---");
-            e.printStackTrace(); // Esto llenará tu consola de texto rojo útil
-            System.err.println("--- FIN DEL RASTRO DETALLADO ---");
-
-            if (e.getCause() != null) {
-                System.err.println("CAUSA RAÍZ DETECTADA: " + e.getCause().getMessage());
-            }
+            log.error("🔥 [SERVICE BUS FAIL] ERROR CRÍTICO AL ENVIAR A AZURE: {}", e.getMessage(), e);
         }
 
         return camaActualizada;

@@ -2,7 +2,7 @@ import axios from 'axios';
 
 // Creamos una instancia centralizada de Axios
 const apiClient = axios.create({
-   baseURL: 'http://localhost:8082/api/v1',
+   baseURL: 'http://localhost:9090/api/v1',
     headers: {
         'Content-Type': 'application/json',
     },

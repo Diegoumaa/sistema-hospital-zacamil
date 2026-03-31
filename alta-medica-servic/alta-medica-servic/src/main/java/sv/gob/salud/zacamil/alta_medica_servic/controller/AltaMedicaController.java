@@ -18,40 +18,43 @@ public class AltaMedicaController {
     }
 
     // --- DTOs ACTUALIZADOS PARA EL FORMATO 'Encounter' DEL FRONTEND ---
+    @com.fasterxml.jackson.annotation.JsonIgnoreProperties(ignoreUnknown = true)
     public static class FhirEncounterRequest {
         public String resourceType;
         public String status;
         public List<LocationEntry> location;
     }
 
+    @com.fasterxml.jackson.annotation.JsonIgnoreProperties(ignoreUnknown = true)
     public static class LocationEntry {
         public LocationDetails location;
     }
 
+    @com.fasterxml.jackson.annotation.JsonIgnoreProperties(ignoreUnknown = true)
     public static class LocationDetails {
         public String reference; // Recibirá "Location/CAMA-102"
     }
 
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(AltaMedicaController.class);
+
     @PostMapping
     public ResponseEntity<String> solicitarAlta(@RequestBody FhirEncounterRequest request) {
-        try {
-            // 1. Validamos que venga la ubicación
-            if (request.location == null || request.location.isEmpty() || request.location.get(0).location == null) {
-                return ResponseEntity.badRequest().body("Error: Formato FHIR inválido. Falta la referencia de la cama.");
-            }
-
-            // 2. Extraemos y limpiamos el número de cama
-            String referencia = request.location.get(0).location.reference;
-            String numeroCamaExtraido = referencia.replace("Location/CAMA-", "").replace("Location/Cama-", "").replace("Location/", "");
-
-            System.out.println("Intentando buscar en BD el numeroCama exacto: [" + numeroCamaExtraido + "]");
-
-            // 3. Procesamos con la lógica de negocio
-            Cama camaActualizada = altaMedicaService.procesarSolicitudAlta(numeroCamaExtraido);
-
-            return ResponseEntity.ok("Alta procesada exitosamente bajo estándar FHIR Encounter para la cama: " + camaActualizada.getNumeroCama());
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body("Error de validación: " + e.getMessage());
+        log.info("📥 [INBOUND] Petición POST recibida en /api/v1/altas para procesar alta médica.");
+        // 1. Validamos que venga la ubicación
+        if (request.location == null || request.location.isEmpty() || request.location.get(0).location == null) {
+            throw new IllegalArgumentException("Error: Formato FHIR inválido. Falta la referencia de la cama.");
         }
+
+        // 2. Extraemos y limpiamos el número de cama
+        String referencia = request.location.get(0).location.reference;
+        String numeroCamaExtraido = referencia.replace("Location/CAMA-", "").replace("Location/Cama-", "").replace("Location/", "");
+
+        log.info("🔍 Transformando payload FHIR. Cama extraída: [{}]", numeroCamaExtraido);
+
+        // 3. Procesamos con la lógica de negocio
+        Cama camaActualizada = altaMedicaService.procesarSolicitudAlta(numeroCamaExtraido);
+        log.info("✅ [OUTBOUND HTTP] Alta procesada correctamente para cama: {}", camaActualizada.getNumeroCama());
+
+        return ResponseEntity.ok("Alta procesada exitosamente bajo estándar FHIR Encounter para la cama: " + camaActualizada.getNumeroCama());
     }
 }

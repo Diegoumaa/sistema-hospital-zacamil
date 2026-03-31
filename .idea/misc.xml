@@ -7,6 +7,7 @@
         <option value="$PROJECT_DIR$/alta-medica-servic/alta-medica-servic/pom.xml" />
         <option value="$PROJECT_DIR$/api-gateway/api-gateway/pom.xml" />
         <option value="$PROJECT_DIR$/servicio-limpieza/pom.xml" />
+        <option value="$PROJECT_DIR$/consultas-cama-service/pom.xml" />
       </list>
     </option>
   </component>

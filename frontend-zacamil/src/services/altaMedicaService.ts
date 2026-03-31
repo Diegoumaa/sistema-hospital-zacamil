@@ -21,10 +21,10 @@ export const altaMedicaService = {
         } catch (error) {
             // 3. Manejo de errores centralizado
             if (error instanceof AxiosError) {
-                // Error conocido de Axios (ej: 404, 500, sin internet)
-                throw new Error(error.response?.data || 'Error de conexión con el servidor');
+                // Buscamos el mensaje dinámico del GlobalExceptionHandler del backend (ej: "La cama 101 no existe")
+                const backendMessage = error.response?.data?.message;
+                throw new Error(backendMessage || 'Error de conexión con el servidor hospitalario');
             }
-            // Error desconocido (ej: error de código nuestro)
             throw error;
         }
     }

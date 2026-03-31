@@ -13,26 +13,22 @@ public class DataSeeder implements CommandLineRunner {
         this.camaRepository = camaRepository;
     }
 
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(DataSeeder.class);
+
     @Override
     public void run(String... args) throws Exception {
-        // Si la tabla de camas está vacía, creamos las 3 camas del frontend
-        if (camaRepository.count() == 0) {
-            Cama cama101 = new Cama();
-            cama101.setNumeroCama("101");
-            cama101.setEstado("OCUPADA");
-            camaRepository.save(cama101);
+        log.info("🧹 LIMPIANDO TABLA DE CAMAS EN SQL ANTES DEL SEEDING...");
+        camaRepository.deleteAll(); // Destruimos los datos anteriores para un arranque limpio
+        
+        log.info("🌱 SEMBRANDO ESCENARIOS DE PRUEBA EN SQL SERVER...");
 
-            Cama cama102 = new Cama();
-            cama102.setNumeroCama("102");
-            cama102.setEstado("OCUPADA");
-            camaRepository.save(cama102);
+        Cama cama101 = new Cama("101", "OCUPADA", "PAC-111");
+        Cama cama102 = new Cama("102", "OCUPADA", "PAC-222");
+        Cama cama103 = new Cama("103", "DISPONIBLE", null);
+        Cama cama104 = new Cama("104", "CONTAMINADA", null);
 
-            Cama cama205 = new Cama();
-            cama205.setNumeroCama("205");
-            cama205.setEstado("OCUPADA");
-            camaRepository.save(cama205);
+        camaRepository.saveAll(java.util.Arrays.asList(cama101, cama102, cama103, cama104));
 
-            System.out.println("🛏️ HOSPITAL ZACAMIL: Camas iniciales insertadas en la base de datos.");
-        }
+        log.info("✅ 🛏️ HOSPITAL ZACAMIL: 4 Escenarios de camas insertados en SQL exitosamente.");
     }
 }
