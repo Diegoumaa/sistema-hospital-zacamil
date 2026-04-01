@@ -34,7 +34,10 @@ const PanelLimpieza: React.FC = () => {
         try {
             setLoading(true);
             const data = await getCamasContaminadas();
-            setCamas(data);
+            // 🛡️ Filtro estricto frontend: Asegura la segregación de roles visual, forzando 
+            // que NUNCA aparezcan camas con "OCUPADA" o "DISPONIBLE" y protegiendo de desincronización
+            const contaminadasFilter = data.filter((c: CamaLimpieza) => c.estado === 'CONTAMINADA');
+            setCamas(contaminadasFilter);
             setError('');
         } catch (err: any) {
             console.error(err);

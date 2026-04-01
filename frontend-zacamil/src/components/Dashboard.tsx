@@ -1,24 +1,110 @@
-import { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { altaMedicaService } from "../services/altaMedicaService";
+import apiClient from "../api/axiosClient";
 import { ZodError } from "zod";
 import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
-import { ComboboxCamas } from "./ui/ComboboxCamas";
 import type { FhirEncounter } from "../schemas/altaMedicaSchema";
+import { SkeletonLoader } from "./ui/SkeletonLoader";
+import { EmptyState } from "./ui/EmptyState";
+
+interface Cama {
+    id: string; // If available
+    numeroCama: string;
+    estado: string;
+    pacienteActual: string | null;
+}
 
 export default function Dashboard() {
     const { medico, logout } = useAuth();
     const { addToast } = useToast();
 
-    const [pacienteId, setPacienteId] = useState("");
-    const [numeroCama, setNumeroCama] = useState("");
-    const [diagnostico, setDiagnostico] = useState("");
+    // Data lists
+    const [camas, setCamas] = useState<Cama[]>([]);
+    const [isLoadingCamas, setIsLoadingCamas] = useState(true);
+    const [errorCamas, setErrorCamas] = useState("");
 
-    const [cargando, setCargando] = useState<boolean>(false);
+    // Modal and form states
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [selectedCama, setSelectedCama] = useState<Cama | null>(null);
+    const [diagnostico, setDiagnostico] = useState("");
+    const [cargandoAlta, setCargandoAlta] = useState(false);
+
+    // Fetch camas
+    const fetchCamas = async (controller?: AbortController) => {
+        try {
+            setIsLoadingCamas(true);
+            setErrorCamas("");
+            const response = await apiClient.get('/consultas/camas/disponibilidad', {
+                signal: controller?.signal
+            });
+            const data = response.data;
+            
+            let camasArray: any[] = [];
+            if (Array.isArray(data)) {
+                camasArray = data;
+            } else if (data && Array.isArray(data.content)) {
+                camasArray = data.content;
+            } else if (data && data._embedded) {
+                const firstKey = Object.keys(data._embedded)[0]; 
+                camasArray = data._embedded[firstKey] || [];
+            } else if (data && Array.isArray(data.data)) {
+                camasArray = data.data;
+            }
+
+            // 🛡️ Filtro estricto frontend: Asegura que el panel del doctor SOLAMENTE 
+            // muestre y procese camas OCUPADAS, ignorando las CONTAMINADAS O DISPONIBLES.
+            const camasOcupadas = camasArray.filter((c: any) => c.estado === 'OCUPADA');
+            
+            setCamas(camasOcupadas.map((c: any) => ({
+                id: c.id?.toString() || c.numeroCama.toString(),
+                numeroCama: c.numeroCama.toString(),
+                estado: c.estado,
+                pacienteActual: c.pacienteActual || null
+            })));
+
+        } catch (err: any) {
+            if (err.name === 'CanceledError') {
+                console.log("Petición abortada");
+                return;
+            }
+            console.error("Error fetching camas:", err);
+            setErrorCamas("No se pudieron cargar las camas ocupadas.");
+            addToast("Error al conectar con la base de datos de camas.", "error");
+        } finally {
+            setIsLoadingCamas(false);
+        }
+    };
+
+    useEffect(() => {
+        const controller = new AbortController();
+        fetchCamas(controller);
+        return () => controller.abort();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    const abrirModalAlta = (cama: Cama) => {
+        setSelectedCama(cama);
+        setDiagnostico("");
+        setIsModalOpen(true);
+    };
+
+    const cerrarModal = () => {
+        if (!cargandoAlta) {
+            setIsModalOpen(false);
+            setSelectedCama(null);
+            setDiagnostico("");
+        }
+    };
 
     const solicitarAlta = async (e: React.FormEvent) => {
         e.preventDefault();
-        setCargando(true);
+        if (!selectedCama) return;
+
+        // Fallback robusto por inyecciones en base de datos.
+        const pacienteId = selectedCama.pacienteActual || "DESCONOCIDO";
+
+        setCargandoAlta(true);
 
         try {
             const payload: FhirEncounter = {
@@ -30,7 +116,7 @@ export default function Dashboard() {
                 location: [
                     {
                         location: {
-                            reference: `Location/${numeroCama}`
+                            reference: `Location/${selectedCama.numeroCama}`
                         }
                     }
                 ],
@@ -45,10 +131,9 @@ export default function Dashboard() {
             await altaMedicaService.procesarAlta(payload);
             addToast(`¡Alta médica generada exitosamente!`, 'success');
             
-            // Limpiar formulario tras éxito (opcional)
-            setPacienteId("");
-            setNumeroCama("");
-            setDiagnostico("");
+            cerrarModal();
+            // Refrescar lista de camas para retirar la que dimos de alta
+            fetchCamas();
             
         } catch (error) {
             console.error(error);
@@ -62,119 +147,194 @@ export default function Dashboard() {
                 addToast('Ocurrió un error de red o de servidor. Por favor, vuelva a intentarlo.', 'error');
             }
         } finally {
-            setCargando(false)
+            setCargandoAlta(false);
         }
     }
 
     return (
-        <div className="min-h-screen bg-gray-50 p-6 md:p-12 font-sans">
-            <header className="mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div>
-                    <h1 className="text-3xl font-bold text-gray-800 tracking-tight">Panel Médico</h1>
-                    <p className="text-gray-500 mt-1">Hospital Nacional Zacamil - Módulo de Altas</p>
-                </div>
-                <div className="flex items-center gap-4">
-                    <div className="text-right">
-                        <p className="text-sm font-semibold text-gray-700">{medico?.nombre}</p>
-                        <p className="text-xs text-gray-500">{medico?.especialidad}</p>
-                    </div>
-                    <button 
-                        onClick={logout} 
-                        className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 transition"
-                    >
-                        Salir
-                    </button>
-                </div>
-            </header>
-
-            <main className="mx-auto max-w-2xl rounded-xl bg-white p-6 md:p-8 shadow-sm border border-gray-100">
-                <div className="mb-6 border-b border-gray-100 pb-4">
-                    <h2 className="text-xl font-semibold text-blue-800">Solicitud de Alta Médica</h2>
-                    <p className="text-sm text-gray-500 mt-1">
-                        Complete el formulario para registrar el alta en el estándar FHIR.
-                    </p>
-                </div>
-
-                <form onSubmit={solicitarAlta} className="space-y-6">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div>
-                            <label htmlFor="pacienteId" className="mb-1.5 block text-sm font-medium text-gray-700">
-                                ID del Paciente
-                            </label>
-                            <input
-                                id="pacienteId"
-                                type="text"
-                                required
-                                value={pacienteId}
-                                onChange={(e) => setPacienteId(e.target.value)}
-                                className="w-full rounded-md border border-gray-300 px-3 py-2.5 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 transition-shadow"
-                                placeholder="Ej: 12345"
-                            />
-                        </div>
-
-                        <div>
-                            <label htmlFor="numeroCama" className="mb-1.5 block text-sm font-medium text-gray-700">
-                                Número de Cama
-                            </label>
-                            <ComboboxCamas
-                                value={numeroCama}
-                                onChange={setNumeroCama}
-                            />
-                        </div>
-                    </div>
-
+        <div className="min-h-screen bg-slate-50 p-6 md:p-8 font-sans relative">
+            <div className="max-w-7xl mx-auto">
+                <header className="mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
                     <div>
-                        <label htmlFor="diagnostico" className="mb-1.5 block text-sm font-medium text-gray-700">
-                            Diagnóstico / Motivo de Alta
-                        </label>
-                        <textarea
-                            id="diagnostico"
-                            required
-                            rows={3}
-                            value={diagnostico}
-                            onChange={(e) => setDiagnostico(e.target.value)}
-                            className="w-full rounded-md border border-gray-300 px-3 py-2.5 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 transition-shadow resize-none"
-                            placeholder="Detalle el motivo del alta o notas para el paciente..."
-                        />
+                        <h1 className="text-3xl font-extrabold text-slate-800 tracking-tight">Panel Médico</h1>
+                        <p className="text-slate-500 mt-1">Gestión Interactiva de Altas - Hospital Nacional Zacamil</p>
                     </div>
-
-                    <div className="rounded-md bg-blue-50 p-4 border border-blue-100">
-                        <div className="flex">
-                            <div className="flex-shrink-0">
-                                <svg className="h-5 w-5 text-blue-400" viewBox="0 0 20 20" fill="currentColor">
-                                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-                                </svg>
-                            </div>
-                            <div className="ml-3">
-                                <h3 className="text-sm font-medium text-blue-800">Firma Electrónica</h3>
-                                <div className="mt-1 text-sm text-blue-700">
-                                    <p>Esta acción será firmada digitalmente por: <strong>{medico?.nombre}</strong> (ID: {medico?.idPractitioner})</p>
-                                </div>
-                            </div>
+                    <div className="flex items-center gap-4">
+                        <div className="text-right">
+                            <p className="text-sm font-bold text-slate-800">{medico?.nombre}</p>
+                            <p className="text-xs text-slate-500">{medico?.especialidad}</p>
                         </div>
-                    </div>
-
-                    <div className="pt-2">
-                        <button
-                            type="submit"
-                            disabled={cargando}
-                            className={`w-full flex justify-center py-2.5 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white focus:outline-none focus:ring-2 focus:ring-offset-2 transition-colors ${
-                                cargando ? 'bg-blue-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700 focus:ring-blue-500'
-                            }`}
+                        <button 
+                            onClick={logout} 
+                            className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 transition"
                         >
-                            {cargando ? (
-                                <span className="flex items-center gap-2">
-                                    <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                    </svg>
-                                    Procesando FHIR...
-                                </span>
-                            ) : 'Generar Alta Médica'}
+                            Salir
                         </button>
                     </div>
-                </form>
-            </main>
+                </header>
+
+                <div className="flex justify-end mb-6">
+                    <button 
+                        onClick={() => fetchCamas()}
+                        className="bg-white border text-sm font-semibold border-slate-200 text-slate-700 px-4 py-2.5 rounded-lg shadow-sm hover:bg-slate-50 hover:shadow-md transition flex items-center gap-2"
+                    >
+                        <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                        Refrescar Vista
+                    </button>
+                </div>
+
+                {isLoadingCamas ? (
+                    <SkeletonLoader count={8} />
+                ) : errorCamas ? (
+                    <div className="bg-red-50 border-l-4 border-red-500 p-5 rounded-md shadow-sm">
+                        <div className="flex items-center">
+                            <svg className="h-6 w-6 text-red-500 mr-3" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" /></svg>
+                            <p className="text-red-700 font-semibold">{errorCamas}</p>
+                        </div>
+                    </div>
+                ) : camas.length === 0 ? (
+                    <EmptyState 
+                        title="Sin pacientes asignados" 
+                        description="¡Gran labor! Actualmente no hay camas ocupadas con pacientes que requieran alta médica." 
+                    />
+                ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                        {camas.map((cama) => (
+                            <div key={cama.id} className="bg-white rounded-xl shadow border border-slate-200 overflow-hidden hover:-translate-y-1 hover:shadow-lg transition-transform duration-300 flex flex-col group relative">
+                                <div className="absolute top-0 inset-x-0 h-1.5 bg-gradient-to-r from-blue-400 to-indigo-500"></div>
+                                <div className="p-6 flex-1 mt-1">
+                                    <div className="flex justify-between items-start mb-5">
+                                        <div className="inline-flex items-center rounded-full bg-blue-50 px-3 py-1 text-xs font-bold uppercase tracking-wider text-blue-700 border border-blue-200">
+                                            <span className="w-1.5 h-1.5 rounded-full bg-blue-500 mr-2 animate-pulse"></span>
+                                            {cama.estado}
+                                        </div>
+                                    </div>
+                                    <h3 className="text-2xl font-extrabold text-slate-900 mb-1">Cama {cama.numeroCama}</h3>
+                                    <div className="bg-slate-50 p-3 rounded-lg border border-slate-100 mb-4 mt-3">
+                                        <p className="text-xs uppercase font-semibold text-slate-400 mb-1">Paciente Asignado</p>
+                                        <p className={`font-medium ${!cama.pacienteActual ? 'text-red-500 italic' : 'text-slate-800'}`}>
+                                            {cama.pacienteActual ? cama.pacienteActual : 'Error: ID No Vinculado'}
+                                        </p>
+                                    </div>
+                                </div>
+                                <div className="bg-slate-50 px-6 py-4 border-t border-slate-100 mt-auto flex justify-between items-center group-hover:bg-slate-100 transition-colors">
+                                    <button 
+                                        onClick={() => abrirModalAlta(cama)}
+                                        disabled={!cama.pacienteActual}
+                                        className={`w-full font-semibold py-2.5 px-4 rounded-lg transition-all shadow-sm text-sm ${
+                                            !cama.pacienteActual 
+                                                ? 'bg-slate-200 text-slate-400 cursor-not-allowed' 
+                                                : 'bg-blue-600 hover:bg-blue-700 text-white focus:ring-4 focus:ring-blue-100 active:scale-95 shadow-md flex justify-center items-center'
+                                        }`}
+                                    >
+                                        {cama.pacienteActual ? 'Procesar Alta Médica' : 'Datos Incompletos'}
+                                    </button>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </div>
+
+            {/* Modal de Alta Médica Superpuesto */}
+            {isModalOpen && selectedCama && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 transition-opacity">
+                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden transition-all transform opacity-100 scale-100">
+                        <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                            <h2 className="text-xl font-extrabold text-slate-800">Formulario Clínico</h2>
+                            <button 
+                                onClick={cerrarModal}
+                                disabled={cargandoAlta}
+                                className="text-slate-400 hover:text-red-500 bg-white rounded-full p-1 hover:bg-slate-100 focus:outline-none transition-colors"
+                            >
+                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                            </button>
+                        </div>
+                        
+                        <div className="p-6">
+                            <form onSubmit={solicitarAlta} className="space-y-6">
+                                <div className="grid grid-cols-2 gap-5">
+                                    <div>
+                                        <label className="mb-1.5 block text-sm font-bold text-slate-700">ID del Paciente</label>
+                                        <div className="relative">
+                                            <input
+                                                type="text"
+                                                readOnly
+                                                disabled
+                                                value={selectedCama.pacienteActual || ''}
+                                                className="w-full rounded-lg border border-slate-300 bg-slate-100 px-3 py-2.5 text-sm text-slate-600 focus:outline-none focus:ring-0 cursor-not-allowed font-semibold shadow-inner"
+                                            />
+                                            <svg className="w-5 h-5 absolute right-3 top-2.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label className="mb-1.5 block text-sm font-bold text-slate-700">Número Cama</label>
+                                        <input
+                                            type="text"
+                                            readOnly
+                                            disabled
+                                            value={selectedCama.numeroCama}
+                                            className="w-full rounded-lg border border-slate-300 bg-slate-100 px-3 py-2.5 text-sm text-slate-600 focus:outline-none focus:ring-0 cursor-not-allowed font-semibold shadow-inner"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label htmlFor="diagnostico" className="mb-1.5 block text-sm font-bold text-slate-700">
+                                        Diagnóstico / Motivo de Alta
+                                    </label>
+                                    <textarea
+                                        id="diagnostico"
+                                        required
+                                        rows={4}
+                                        value={diagnostico}
+                                        onChange={(e) => setDiagnostico(e.target.value)}
+                                        className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30 transition-shadow resize-none shadow-sm"
+                                        placeholder="Ingrese el reporte clínico de culminación de tratamiento u observaciones médicas..."
+                                    />
+                                </div>
+
+                                <div className="rounded-lg bg-blue-50/70 p-4 border border-blue-200 flex items-start mt-2">
+                                    <svg className="h-6 w-6 text-blue-600 mr-3 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                                    </svg>
+                                    <div>
+                                        <h4 className="text-sm font-extrabold text-blue-900 mb-0.5">Certificación Médica Digital</h4>
+                                        <p className="text-xs text-blue-800 leading-relaxed font-medium">
+                                            Al procesar el alta, la transacción FHIR quedará rígidamente firmada y asociada a las credenciales del <strong>Dr. {medico?.nombre}</strong> (Reg: {medico?.idPractitioner}).
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <div className="pt-2 flex gap-3">
+                                    <button
+                                        type="button"
+                                        onClick={cerrarModal}
+                                        disabled={cargandoAlta}
+                                        className="w-1/3 py-2.5 px-4 bg-white border border-slate-300 rounded-lg shadow-sm text-sm font-bold text-slate-700 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-300 transition-colors"
+                                    >
+                                        Cancelar
+                                    </button>
+                                    <button
+                                        type="submit"
+                                        disabled={cargandoAlta}
+                                        className={`w-2/3 flex justify-center items-center py-2.5 px-4 border border-transparent rounded-lg shadow-sm text-sm font-extrabold text-white focus:outline-none focus:ring-4 focus:ring-blue-200 transition-colors ${
+                                            cargandoAlta ? 'bg-blue-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700 active:bg-blue-800'
+                                        }`}
+                                    >
+                                        {cargandoAlta ? (
+                                            <span className="flex items-center gap-2">
+                                                <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                                                Generando...
+                                            </span>
+                                        ) : 'Efectuar Alta Clínica'}
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
