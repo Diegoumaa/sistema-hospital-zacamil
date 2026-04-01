@@ -21,12 +21,16 @@ export const ComboboxCamas: React.FC<ComboboxCamasProps> = ({ value, onChange })
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    const controller = new AbortController();
+
     const fetchCamas = async () => {
       try {
         setIsLoading(true);
         setError(null);
         // Hacemos el request usando nuestro cliente centralizado apuntando al API Gateway
-        const response = await apiClient.get('/consultas/camas/disponibilidad');
+        const response = await apiClient.get('/consultas/camas/disponibilidad', {
+          signal: controller.signal
+        });
         const data = response.data;
         
         console.log("Respuesta de Cosmos DB (Raw Axios Data):", data);
@@ -47,7 +51,10 @@ export const ComboboxCamas: React.FC<ComboboxCamasProps> = ({ value, onChange })
 
         if (!Array.isArray(camasArray)) {
             console.error("❌ Array de camas no encontrado o estructura desconocida:", data);
-            setOptions([]); // Mantenemos el componente vivo vacío
+            if (!controller.signal.aborted) {
+                setOptions([]); // Mantenemos el componente vivo vacío
+                setIsLoading(false);
+            }
             return;
         }
 
@@ -60,16 +67,26 @@ export const ComboboxCamas: React.FC<ComboboxCamasProps> = ({ value, onChange })
             label: `Cama ${cama.numeroCama} - ${cama.estado} (Paciente: ${cama.pacienteActual || 'Desconocido'})`
           }));
 
-        setOptions(camasOcupadas);
-      } catch (err) {
-        console.error("Error cargando camas desde Cosmos DB:", err);
-        setError("Error de red");
-      } finally {
-        setIsLoading(false);
+        if (!controller.signal.aborted) {
+            setOptions(camasOcupadas);
+            setIsLoading(false);
+        }
+      } catch (err: any) {
+        if (err.name === 'CanceledError') {
+            console.log("Petición de camas cancelada (componente desmontado).");
+        } else if (!controller.signal.aborted) {
+            console.error("Error cargando camas desde Cosmos DB:", err);
+            setError("Error de red");
+            setIsLoading(false);
+        }
       }
     };
 
     fetchCamas();
+
+    return () => {
+      controller.abort();
+    };
   }, []);
 
   useEffect(() => {
