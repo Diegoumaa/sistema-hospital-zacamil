@@ -5,6 +5,8 @@ spring:
   application:
     name: consultas-cama-service
   cloud:
+    function:
+      definition: procesarAltaMedica;procesarCamaLimpia
     azure:
       cosmos:
         endpoint: ${COSMOS_ENDPOINT:https://localhost:8081}
@@ -14,15 +16,13 @@ spring:
       servicebus:
         connection-string: Endpoint=sb://bus-zacamil-std.servicebus.windows.net/;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=${AZURE_SB_KEY}
     stream:
-      function:
-        definition: procesarAltaMedica;procesarCamaLimpia
       bindings:
         procesarAltaMedica-in-0:
           destination: altas-topic
-          group: test-sub
+          group: consultas-sub
         procesarCamaLimpia-in-0:
           destination: camas-disponibles-topic
-          group: test-sub
+          group: consultas-sub
       servicebus:
         bindings:
           procesarAltaMedica-in-0:
