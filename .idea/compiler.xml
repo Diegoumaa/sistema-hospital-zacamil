@@ -19,6 +19,7 @@
         <outputRelativeToContentRoot value="true" />
         <module name="api-gateway" />
         <module name="servicio-limpieza" />
+        <module name="auditoria" />
         <module name="consultas-cama-service" />
       </profile>
     </annotationProcessing>

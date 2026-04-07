@@ -25,6 +25,10 @@ public class CamaEventListener {
     @Bean
     public Consumer<CamaEvent> procesarAltaMedica() {
         return event -> {
+            if (event.getNumeroCama() == null) {
+                log.warn("Mensaje descartado en procesarAltaMedica por no tener numero de cama. Evento: {}", event);
+                return;
+            }
             log.info("Recibido evento procesarAltaMedica para la cama: {}", event.getNumeroCama());
             
             CamaView cama = camaViewRepository.findByNumeroCama(event.getNumeroCama())
@@ -45,6 +49,10 @@ public class CamaEventListener {
     @Bean
     public Consumer<CamaEvent> procesarCamaLimpia() {
         return event -> {
+            if (event.getNumeroCama() == null) {
+                log.warn("Mensaje descartado en procesarCamaLimpia por no tener numero de cama. Evento: {}", event);
+                return;
+            }
             log.info("Recibido evento procesarCamaLimpia para la cama: {}", event.getNumeroCama());
             
             CamaView cama = camaViewRepository.findByNumeroCama(event.getNumeroCama())
