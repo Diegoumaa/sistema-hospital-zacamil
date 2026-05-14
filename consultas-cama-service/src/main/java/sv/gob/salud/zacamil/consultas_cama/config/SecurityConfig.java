@@ -13,12 +13,15 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
+                // 1. Deshabilitar CORS y CSRF para evitar bloqueos del navegador en desarrollo
+                .cors(cors -> cors.disable())
+                .csrf(csrf -> csrf.disable())
+                
+                // 2. Hacer que no sea tan estricto: Permite todas las peticiones (permitAll)
                 .authorizeHttpRequests(authz -> authz
-                        // Obliga a que cualquier petición (como traer las camas) exija Token de Microsoft
-                        .anyRequest().authenticated()
-                )
-                // Le dice a Spring que valide los tokens contra Azure Entra ID
-                .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> {}));
+                        .anyRequest().permitAll()
+                );
+                
         return http.build();
     }
 }

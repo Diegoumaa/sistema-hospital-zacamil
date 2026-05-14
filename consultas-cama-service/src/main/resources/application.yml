@@ -14,7 +14,7 @@ spring:
         database: ZacamilReadDB
         populate-query-metrics: true
       servicebus:
-        connection-string: Endpoint=sb://bus-zacamil-std.servicebus.windows.net/;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=${AZURE_SB_KEY}
+        connection-string: Endpoint=sb://buss-zacamil-std.servicebus.windows.net/;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=${AZURE_SB_KEY}
     stream:
       bindings:
         procesarAltaMedica-in-0:

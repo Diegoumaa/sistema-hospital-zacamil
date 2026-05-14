@@ -4,12 +4,6 @@ server:
 spring:
   application:
     name: consultas-cama-service
-  security:
-    oauth2:
-      resourceserver:
-        jwt:
-          issuer-uri: https://login.microsoftonline.com/a9a9a395-9ee3-4b10-b45d-53bfd77c7d72/v2.0
-          audiences: api://32157fa3-8fb6-4872-9309-d04ebfeee376
   cloud:
     function:
       definition: procesarAltaMedica;procesarCamaLimpia
@@ -20,7 +14,7 @@ spring:
         database: ZacamilReadDB
         populate-query-metrics: true
       servicebus:
-        connection-string: Endpoint=sb://bus-zacamil-std.servicebus.windows.net/;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=${AZURE_SB_KEY}
+        connection-string: Endpoint=sb://buss-zacamil-std.servicebus.windows.net/;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=${AZURE_SB_KEY}
     stream:
       bindings:
         procesarAltaMedica-in-0:
