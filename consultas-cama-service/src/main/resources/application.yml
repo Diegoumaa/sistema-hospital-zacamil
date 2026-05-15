@@ -6,11 +6,12 @@ spring:
     name: consultas-cama-service
   cloud:
     function:
-      definition: procesarAltaMedica;procesarCamaLimpia
+      # 1. AQUI AGREGAMOS EL NUEVO EVENTO AL FINAL
+      definition: procesarAltaMedica;procesarCamaLimpia;procesarIngresoPaciente
     azure:
       cosmos:
         endpoint: ${COSMOS_ENDPOINT:https://localhost:8081}
-        key: ${COSMOS_KEY:C2y6yDjf5/R+ob0N8A7Cgv30VRDJIWEHLM+4QDU5DE2nQ9nDuVTqobD4b8mGGyPMbIZnqyMsEcaGQy67XIw/Jw==}
+        key: ${COSMOS_KEY}
         database: ZacamilReadDB
         populate-query-metrics: true
       servicebus:
@@ -23,6 +24,13 @@ spring:
         procesarCamaLimpia-in-0:
           destination: camas-disponibles-topic
           group: consultas-sub
+        # 2. NUEVO BINDING DE ENTRADA PARA EL INGRESO
+        procesarIngresoPaciente-in-0:
+          destination: ingresos-topic
+          group: consultas-sub
+        # 3. NUEVO BINDING DE SALIDA (Para que el StreamBridge no de error 400)
+        ingresos-topic-out-0:
+          destination: ingresos-topic
       servicebus:
         bindings:
           procesarAltaMedica-in-0:
@@ -31,3 +39,10 @@ spring:
           procesarCamaLimpia-in-0:
             consumer:
               auto-complete: true
+          # 4. AUTO-COMPLETE PARA EL NUEVO EVENTO
+          procesarIngresoPaciente-in-0:
+            consumer:
+              auto-complete: true
+          ingresos-topic-out-0:
+            producer:
+              entity-type: topic

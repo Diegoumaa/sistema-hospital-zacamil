@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import axios from "axios";
 import { altaMedicaService } from "../services/altaMedicaService";
 import apiClient from "../api/axiosClient";
 import { ZodError } from "zod";
@@ -30,6 +31,12 @@ export default function Dashboard() {
     const [diagnostico, setDiagnostico] = useState("");
     const [cargandoAlta, setCargandoAlta] = useState(false);
 
+    // Ingreso states
+    const [isModalIngresoOpen, setIsModalIngresoOpen] = useState(false);
+    const [selectedCamaIngreso, setSelectedCamaIngreso] = useState<Cama | null>(null);
+    const [nombrePaciente, setNombrePaciente] = useState("");
+    const [cargandoIngreso, setCargandoIngreso] = useState(false);
+
     // Fetch camas
     const fetchCamas = async (controller?: AbortController) => {
         try {
@@ -53,8 +60,8 @@ export default function Dashboard() {
             }
 
             // 🛡️ Filtro estricto frontend: Asegura que el panel del doctor SOLAMENTE 
-            // muestre y procese camas OCUPADAS, ignorando las CONTAMINADAS O DISPONIBLES.
-            const camasOcupadas = camasArray.filter((c: any) => c.estado === 'OCUPADA');
+            // muestre y procese camas OCUPADAS o DISPONIBLES (para asignar pacientes).
+            const camasOcupadas = camasArray.filter((c: any) => c.estado === 'OCUPADA' || c.estado === 'DISPONIBLE');
             
             setCamas(camasOcupadas.map((c: any) => ({
                 id: c.id?.toString() || c.numeroCama.toString(),
@@ -94,6 +101,20 @@ export default function Dashboard() {
             setIsModalOpen(false);
             setSelectedCama(null);
             setDiagnostico("");
+        }
+    };
+
+    const abrirModalIngreso = (cama: Cama) => {
+        setSelectedCamaIngreso(cama);
+        setNombrePaciente("");
+        setIsModalIngresoOpen(true);
+    };
+
+    const cerrarModalIngreso = () => {
+        if (!cargandoIngreso) {
+            setIsModalIngresoOpen(false);
+            setSelectedCamaIngreso(null);
+            setNombrePaciente("");
         }
     };
 
@@ -148,6 +169,30 @@ export default function Dashboard() {
             }
         } finally {
             setCargandoAlta(false);
+        }
+    }
+
+    const solicitarIngreso = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!selectedCamaIngreso || !nombrePaciente.trim()) return;
+
+        setCargandoIngreso(true);
+
+        try {
+            await axios.post('http://localhost:8083/api/test/ingreso-paciente', {
+                numeroCama: selectedCamaIngreso.numeroCama,
+                nombrePaciente: nombrePaciente.trim()
+            });
+            addToast(`¡Proceso de ingreso iniciado exitosamente!`, 'success');
+            
+            cerrarModalIngreso();
+            fetchCamas();
+            
+        } catch (error: any) {
+            console.error(error);
+            addToast(`Error al procesar el ingreso: ${error.message}`, 'error');
+        } finally {
+            setCargandoIngreso(false);
         }
     }
 
@@ -218,17 +263,27 @@ export default function Dashboard() {
                                     </div>
                                 </div>
                                 <div className="bg-slate-50 px-6 py-4 border-t border-slate-100 mt-auto flex justify-between items-center group-hover:bg-slate-100 transition-colors">
-                                    <button 
-                                        onClick={() => abrirModalAlta(cama)}
-                                        disabled={!cama.pacienteActual}
-                                        className={`w-full font-semibold py-2.5 px-4 rounded-lg transition-all shadow-sm text-sm ${
-                                            !cama.pacienteActual 
-                                                ? 'bg-slate-200 text-slate-400 cursor-not-allowed' 
-                                                : 'bg-blue-600 hover:bg-blue-700 text-white focus:ring-4 focus:ring-blue-100 active:scale-95 shadow-md flex justify-center items-center'
-                                        }`}
-                                    >
-                                        {cama.pacienteActual ? 'Procesar Alta Médica' : 'Datos Incompletos'}
-                                    </button>
+                                    {cama.estado === 'DISPONIBLE' ? (
+                                        <button 
+                                            onClick={() => abrirModalIngreso(cama)}
+                                            className="w-full font-semibold py-2.5 px-4 rounded-lg transition-all shadow-sm text-sm bg-emerald-600 hover:bg-emerald-700 text-white focus:ring-4 focus:ring-emerald-100 active:scale-95 flex justify-center items-center gap-2"
+                                        >
+                                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" /></svg>
+                                            Asignar Paciente
+                                        </button>
+                                    ) : (
+                                        <button 
+                                            onClick={() => abrirModalAlta(cama)}
+                                            disabled={!cama.pacienteActual}
+                                            className={`w-full font-semibold py-2.5 px-4 rounded-lg transition-all shadow-sm text-sm ${
+                                                !cama.pacienteActual 
+                                                    ? 'bg-slate-200 text-slate-400 cursor-not-allowed' 
+                                                    : 'bg-blue-600 hover:bg-blue-700 text-white focus:ring-4 focus:ring-blue-100 active:scale-95 shadow-md flex justify-center items-center'
+                                            }`}
+                                        >
+                                            {cama.pacienteActual ? 'Procesar Alta Médica' : 'Datos Incompletos'}
+                                        </button>
+                                    )}
                                 </div>
                             </div>
                         ))}
@@ -328,6 +383,78 @@ export default function Dashboard() {
                                                 Generando...
                                             </span>
                                         ) : 'Efectuar Alta Clínica'}
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Modal de Ingreso */}
+            {isModalIngresoOpen && selectedCamaIngreso && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 transition-opacity">
+                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden transition-all transform opacity-100 scale-100">
+                        <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                            <h2 className="text-xl font-extrabold text-slate-800">Asignar Paciente</h2>
+                            <button 
+                                onClick={cerrarModalIngreso}
+                                disabled={cargandoIngreso}
+                                className="text-slate-400 hover:text-red-500 bg-white rounded-full p-1 hover:bg-slate-100 focus:outline-none transition-colors"
+                            >
+                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                            </button>
+                        </div>
+                        
+                        <div className="p-6">
+                            <form onSubmit={solicitarIngreso} className="space-y-6">
+                                <div>
+                                    <label className="mb-1.5 block text-sm font-bold text-slate-700">Número de Cama</label>
+                                    <input
+                                        type="text"
+                                        readOnly
+                                        disabled
+                                        value={selectedCamaIngreso.numeroCama}
+                                        className="w-full rounded-lg border border-slate-300 bg-slate-100 px-3 py-2.5 text-sm text-slate-600 focus:outline-none focus:ring-0 cursor-not-allowed font-semibold shadow-inner"
+                                    />
+                                </div>
+                                <div>
+                                    <label htmlFor="nombrePaciente" className="mb-1.5 block text-sm font-bold text-slate-700">
+                                        Nombre del Paciente
+                                    </label>
+                                    <input
+                                        type="text"
+                                        id="nombrePaciente"
+                                        required
+                                        value={nombrePaciente}
+                                        onChange={(e) => setNombrePaciente(e.target.value)}
+                                        className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 transition-shadow shadow-sm"
+                                        placeholder="Ingrese el nombre completo del paciente..."
+                                    />
+                                </div>
+
+                                <div className="pt-2 flex gap-3">
+                                    <button
+                                        type="button"
+                                        onClick={cerrarModalIngreso}
+                                        disabled={cargandoIngreso}
+                                        className="w-1/3 py-2.5 px-4 bg-white border border-slate-300 rounded-lg shadow-sm text-sm font-bold text-slate-700 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-300 transition-colors"
+                                    >
+                                        Cancelar
+                                    </button>
+                                    <button
+                                        type="submit"
+                                        disabled={cargandoIngreso}
+                                        className={`w-2/3 flex justify-center items-center py-2.5 px-4 border border-transparent rounded-lg shadow-sm text-sm font-extrabold text-white focus:outline-none focus:ring-4 focus:ring-emerald-200 transition-colors ${
+                                            cargandoIngreso ? 'bg-emerald-400 cursor-not-allowed' : 'bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800'
+                                        }`}
+                                    >
+                                        {cargandoIngreso ? (
+                                            <span className="flex items-center gap-2">
+                                                <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                                                Asignando...
+                                            </span>
+                                        ) : 'Asignar Paciente'}
                                     </button>
                                 </div>
                             </form>

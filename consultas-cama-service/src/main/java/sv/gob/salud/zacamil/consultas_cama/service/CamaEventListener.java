@@ -12,6 +12,8 @@ import java.util.Date;
 import java.util.UUID;
 import java.util.function.Consumer;
 
+import sv.gob.salud.zacamil.consultas_cama.dto.PacienteIngresadoEvent;
+
 @Service
 public class CamaEventListener {
 
@@ -66,6 +68,29 @@ public class CamaEventListener {
             
             camaViewRepository.save(cama);
             log.info("Cama {} actualizada a DISPONIBLE en Cosmos DB", event.getNumeroCama());
+        };
+    }
+    @Bean
+    public Consumer<PacienteIngresadoEvent> procesarIngresoPaciente() {
+        return event -> {
+            if (event.getNumeroCama() == null) {
+                log.warn("Mensaje descartado en procesarIngresoPaciente por no tener numero de cama. Evento: {}", event);
+                return;
+            }
+            log.info("Recibido evento procesarIngresoPaciente para la cama: {}", event.getNumeroCama());
+            
+            CamaView cama = camaViewRepository.findByNumeroCama(event.getNumeroCama())
+                    .orElseGet(() -> CamaView.builder()
+                            .id(UUID.randomUUID().toString())
+                            .numeroCama(event.getNumeroCama())
+                            .build());
+            
+            cama.setEstado("OCUPADA");
+            cama.setPacienteActual(event.getNombrePaciente());
+            cama.setUltimaActualizacion(new Date());
+            
+            camaViewRepository.save(cama);
+            log.info("Cama {} actualizada a OCUPADA en Cosmos DB con paciente {}", event.getNumeroCama(), event.getNombrePaciente());
         };
     }
 }
